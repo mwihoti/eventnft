@@ -1,0 +1,23 @@
+name = "bcn-meetup/nft-minting"
+version = "0.0.0"
+compiler = "v1.1.21"
+plutus = "v3"
+license = "Apache-2.0"
+description = "Aiken contracts for project 'bcn-meetup/nft-minting'"
+
+[repository]
+user = "bcn-meetup"
+project = "nft-minting"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "v3.1.0"
+source = "github"
+
+[[dependencies]]
+name = "aiken-lang/fuzz"
+version = "v2.2.0"
+source = "github"
+
+[config]
