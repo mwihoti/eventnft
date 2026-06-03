@@ -1,13 +1,11 @@
-import { readFile } from 'fs/promises';
-import path from 'path';
 import { NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { generateSVG } from '../../../generate-svg.js';
+import { buildAttendeeMetadata } from '../../../lib/attendee-metadata';
 import { normalizeMeshMetadata } from '../../../lib/mesh-metadata';
 
 export const runtime = 'nodejs';
 
-async function pinPngToPinata(png: Buffer, name: string): Promise<string> {
+async function pinFileToPinata(file: Blob, name: string): Promise<string> {
   const apiKey = process.env.PINATA_API_KEY;
   const secretKey = process.env.PINATA_SECRET_KEY;
   if (!apiKey || !secretKey) {
@@ -15,7 +13,7 @@ async function pinPngToPinata(png: Buffer, name: string): Promise<string> {
   }
 
   const form = new FormData();
-  form.append('file', new Blob([new Uint8Array(png)], { type: 'image/png' }), name);
+  form.append('file', file, name);
   form.append('pinataMetadata', JSON.stringify({ name }));
   // CIDv0 (Qm... 46 chars) keeps `ipfs://<cid>` under the 64-byte CIP-25
   // metadatum cap so it isn't chunked into a string array — wallets that
@@ -64,17 +62,13 @@ export async function POST(request: Request) {
     }
 
     const attendeeId = String(attendeeNumber).padStart(3, '0');
-    const metadataPath = path.join(
-      process.cwd(),
-      'output',
-      'metadata',
-      `BCN_Meetup_${attendeeId}.json`,
-    );
-    const metadata = JSON.parse(await readFile(metadataPath, 'utf8'));
+    const metadata = buildAttendeeMetadata(attendeeNumber);
 
     const svg = generateSVG(attendeeNumber, Number(metadata.attended_count ?? 1), attendeeName);
-    const png = await sharp(Buffer.from(svg)).png().toBuffer();
-    const cid = await pinPngToPinata(png, `BCN_Meetup_${attendeeId}_${attendeeName}.png`);
+    const cid = await pinFileToPinata(
+      new Blob([svg], { type: 'image/svg+xml' }),
+      `BCN_Meetup_${attendeeId}_${attendeeName}.svg`,
+    );
     const ipfsUri = `ipfs://${cid}`;
 
     return NextResponse.json({
@@ -87,6 +81,7 @@ export async function POST(request: Request) {
         claimed_by: attendeeName,
         receiver: address,
         image: ipfsUri,
+        mediaType: 'image/svg+xml',
         graffiti_image: ipfsUri,
       }),
     });

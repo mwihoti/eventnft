@@ -9,10 +9,17 @@ import {
   applyParamsToScript,
   deserializeAddress,
   resolvePlutusScriptAddress,
+  resolveScriptHash,
 } from '@meshsdk/core';
 import blueprint from '../../plutus.json';
 import { buildAttendeeDatum } from '../lib/attendee-datum';
-import { chunkCip25Metadata, normalizeMeshMetadata } from '../lib/mesh-metadata';
+import {
+  buildCip25V2Metadata,
+  cip68UserAssetNameHex,
+  normalizeMeshMetadata,
+} from '../lib/mesh-metadata';
+
+const PREVIEW_VERSION = 'blockchain-centre-logo-v1';
 
 export default function ClaimPageClient() {
   return (
@@ -41,7 +48,7 @@ function ClaimPageContent() {
   const trimmedAttendeeName = attendeeName.trim();
   const previewSrc = `/api/preview?n=${claimAttendeeNumber}${
     trimmedAttendeeName ? `&name=${encodeURIComponent(trimmedAttendeeName)}` : ''
-  }`;
+  }&v=${PREVIEW_VERSION}`;
 
   useEffect(() => {
     const parsedAttendeeNumber = Number(claimAttendeeNumber);
@@ -166,6 +173,7 @@ function ClaimPageContent() {
         code: applyParamsToScript(mintingBlueprint.compiledCode, [pubKeyHash, 200]),
         version: 'V3' as const,
       };
+      const policyId = resolveScriptHash(mintingScript.code, 'V3');
       const referenceScript = {
         code: applyParamsToScript(referenceBlueprint.compiledCode, [pubKeyHash]),
         version: 'V3' as const,
@@ -243,14 +251,26 @@ function ClaimPageContent() {
           version: Number(preparedMetadata.version ?? 1),
         }),
       );
-      tx.setMetadata(721, chunkCip25Metadata({
-        [`BCN_Meetup_${attendeeId}`]: {
+      tx.setMetadata(721, buildCip25V2Metadata({
+        policyId,
+        assetNameHex: cip68UserAssetNameHex(`BCN_Meetup_${attendeeId}`),
+        metadata: normalizeMeshMetadata({
           ...mintMetadata,
           name: preparedMetadata.name,
+          image: preparedMetadata.image,
+          mediaType: preparedMetadata.mediaType ?? 'image/svg+xml',
+          description: `BCN Meetup attendee NFT claimed by ${trimmedAttendeeName}`,
+          files: [
+            {
+              name: preparedMetadata.name,
+              mediaType: preparedMetadata.mediaType ?? 'image/svg+xml',
+              src: preparedMetadata.image,
+            },
+          ],
           claimed_by: trimmedAttendeeName,
           attendee_number: Number(claimAttendeeNumber),
           preview: `/api/preview?n=${claimAttendeeNumber}&name=${encodeURIComponent(trimmedAttendeeName)}`,
-        },
+        }),
       }));
 
       // Replace Mesh's bundled cost-model defaults with the live ones from the

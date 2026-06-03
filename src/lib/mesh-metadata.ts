@@ -10,6 +10,29 @@ export function chunkCip25Metadata<T>(value: T): T {
   return chunkCip25Value(value) as T;
 }
 
+export function buildCip25V2Metadata({
+  policyId,
+  assetNameHex,
+  metadata,
+}: {
+  policyId: string;
+  assetNameHex: string;
+  metadata: Record<string, unknown>;
+}) {
+  const policyMap = new Map();
+  const assetMap = new Map();
+
+  assetMap.set(hexToBytes(assetNameHex), chunkCip25Metadata(metadata));
+  policyMap.set(hexToBytes(policyId), assetMap);
+  policyMap.set('version', 2);
+
+  return policyMap;
+}
+
+export function cip68UserAssetNameHex(assetName: string) {
+  return `000de140${stringToHex(assetName)}`;
+}
+
 const MAX_METADATUM_BYTES = 64;
 const encoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
 
@@ -43,6 +66,24 @@ function chunkCip25Value(value: any): any {
     );
   }
   return value;
+}
+
+function hexToBytes(hex: string) {
+  if (hex.length % 2 !== 0) {
+    throw new Error('Invalid hex string.');
+  }
+
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
+  }
+  return bytes;
+}
+
+function stringToHex(value: string) {
+  return Array.from(new TextEncoder().encode(value))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 function normalizeMeshMetadataValue(value: any): any {

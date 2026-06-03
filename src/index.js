@@ -41,10 +41,10 @@ async function generate(n) {
 
   // Save Metadata (CIP-68 datum shape)
   const metadata = {
-    "name": `BCN Meetup — Attendee #${attendeeNumber.toString().padStart(3, '0')}`,
+    "name": `BCN Meetup - Attendee #${attendeeNumber.toString().padStart(3, '0')}`,
     "image": "ipfs://REPLACE_WITH_ACTUAL_PNG_CID",
     "event_name": "Community Meetup",
-    "event_date": "June 15 · 2025",
+    "event_date": "June 15 - 2025",
     "venue": "Blockchain Centre NBO",
     "location": "Argwings Kodhek Rd, Nairobi",
     "attendee_number": attendeeNumber,
