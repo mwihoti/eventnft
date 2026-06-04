@@ -120,10 +120,6 @@ export function generateSVG(attendeeNumber, attendedCount = 1, attendeeName = ''
       <text y="320" x="240" text-anchor="middle" fill="#555" font-style="italic">Unlocks post-event</text>
     </g>
 
-    <g transform="translate(300, 600)" text-anchor="middle">
-      <rect x="-80" y="-20" width="160" height="40" rx="20" fill="${palette.main}" fill-opacity="0.2" stroke="${palette.main}" />
-      <text y="8" font-family="${FONT_FAMILY}" font-size="16" fill="${palette.main}" font-weight="bold">ADA NAIROBI DAO</text>
-    </g>
   </g>
 
   <!-- Side Walls -->

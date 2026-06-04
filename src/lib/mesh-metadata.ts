@@ -22,11 +22,46 @@ export function buildCip25V2Metadata({
   const policyMap = new Map();
   const assetMap = new Map();
 
-  assetMap.set(hexToBytes(assetNameHex), chunkCip25Metadata(metadata));
+  // Mesh's CST serializer (toCardanoMetadatum) only accepts number, string,
+  // bigint, Uint8Array, Map and Array — a plain object throws "Unsupported
+  // Metadatum type". So the asset metadata (and any nested objects such as
+  // `files`) must be converted into Maps, not left as plain objects.
+  assetMap.set(hexToBytes(assetNameHex), toCip25Metadatum(metadata));
   policyMap.set(hexToBytes(policyId), assetMap);
   policyMap.set('version', 2);
 
   return policyMap;
+}
+
+// Recursively turn a CIP-25 metadata value into something Mesh's CST
+// serializer accepts: plain objects become Maps with string keys, strings are
+// chunked to the 64-byte cap, arrays/maps recurse, and scalars pass through.
+function toCip25Metadatum(value: any): any {
+  if (typeof value === 'string') return chunkString(value);
+  if (
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    value instanceof Uint8Array
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(toCip25Metadatum);
+  if (value instanceof Map) {
+    const map = new Map();
+    value.forEach((entryValue, entryKey) => {
+      map.set(entryKey, toCip25Metadatum(entryValue));
+    });
+    return map;
+  }
+  if (value && typeof value === 'object') {
+    const map = new Map();
+    for (const [key, entryValue] of Object.entries(value)) {
+      if (entryValue === undefined) continue;
+      map.set(key, toCip25Metadatum(entryValue));
+    }
+    return map;
+  }
+  return value;
 }
 
 export function cip68UserAssetNameHex(assetName: string) {

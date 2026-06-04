@@ -5,3 +5,4 @@ output/
 .env
 *.tsbuildinfo
 .vercel
+.env.example
