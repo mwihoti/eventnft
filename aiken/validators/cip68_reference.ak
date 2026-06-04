@@ -2,7 +2,7 @@ use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
 use cardano/assets
 use cardano/transaction.{InlineDatum, Output, OutputReference, Transaction}
-use types.{AttendeeMetadata, BurnTokens, ReferenceAction, UpdateMetadata}
+use types.{BurnTokens, Cip68Datum, ReferenceAction, UpdateMetadata}
 
 fn get_tier_rank(tier: ByteArray) -> Int {
   if tier == "Newcomer" {
@@ -20,7 +20,7 @@ fn get_tier_rank(tier: ByteArray) -> Int {
 
 validator cip68_reference(organiser_pkh: VerificationKeyHash) {
   spend(
-    datum_opt: Option<AttendeeMetadata>,
+    datum_opt: Option<Cip68Datum>,
     redeemer: ReferenceAction,
     utxo: OutputReference,
     self: Transaction,
@@ -32,21 +32,22 @@ validator cip68_reference(organiser_pkh: VerificationKeyHash) {
         expect Some(datum) = datum_opt
         expect is_organiser_signed
 
-        // 1. Immutable fields check
-        expect new_metadata.attendee_number == datum.attendee_number
-        expect new_metadata.edition == datum.edition
-        expect new_metadata.event_name == datum.event_name
+        // 1. Immutable fields check (app data lives in the CIP-68 `extra` field)
+        expect
+          new_metadata.extra.attendee_number == datum.extra.attendee_number
+        expect new_metadata.extra.edition == datum.extra.edition
+        expect new_metadata.extra.event_name == datum.extra.event_name
 
         // 2. Version increment
         expect new_metadata.version == datum.version + 1
 
         // 3. Tier rank non-decreasing
-        let old_rank = get_tier_rank(datum.tier)
-        let new_rank = get_tier_rank(new_metadata.tier)
+        let old_rank = get_tier_rank(datum.extra.tier)
+        let new_rank = get_tier_rank(new_metadata.extra.tier)
         expect new_rank >= old_rank
 
         // 4. Attended count non-decreasing
-        expect new_metadata.attended_count >= datum.attended_count
+        expect new_metadata.extra.attended_count >= datum.extra.attended_count
 
         // 5. Reference token re-output to the same script address
         let own_output =
@@ -66,7 +67,7 @@ validator cip68_reference(organiser_pkh: VerificationKeyHash) {
               own_output.value,
             ) && when out_datum is {
               InlineDatum(datum_data) -> {
-                expect output_metadata: AttendeeMetadata = datum_data
+                expect output_metadata: Cip68Datum = datum_data
                 output_metadata == new_metadata
               }
               _ -> False

@@ -10,6 +10,7 @@ import {
   deserializeAddress,
   resolvePlutusScriptAddress,
   resolveScriptHash,
+  serializeData,
 } from '@meshsdk/core';
 import blueprint from '../../plutus.json';
 import { buildAttendeeDatum } from '../lib/attendee-datum';
@@ -224,16 +225,19 @@ function ClaimPageContent() {
         },
       );
 
-      // mintAsset places a CIP-68 metadata Map onto the reference output's inline
-      // datum, but Mesh's getOutputMinLovelace clones outputs via JSON which loses
-      // Maps — that's what raises "Cannot convert undefined to a BigInt" during
-      // build. Overwrite with the positional AttendeeMetadata constr the Aiken
-      // validator actually expects. After mintAsset, the pending txOutput is the
-      // reference output, so txOutInlineDatumValue targets the right one.
-      (tx as any).txBuilder.txOutInlineDatumValue(
+      // mintAsset puts a generic CIP-68 metadata datum on the reference output,
+      // but the Aiken validator expects our Cip68Datum shape (metadata map +
+      // version + typed extra). Overwrite it with buildAttendeeDatum. We pass it
+      // as CBOR hex (not a Mesh Data object): the datum contains a Map, and
+      // Mesh's getOutputMinLovelace clones outputs via JSON which loses Maps —
+      // that's what raises "Cannot convert undefined to a BigInt" during build.
+      // A CBOR string survives the clone. After mintAsset, the pending txOutput
+      // is the reference output, so txOutInlineDatumValue targets the right one.
+      const referenceDatumCbor = serializeData(
         buildAttendeeDatum({
           name: String(preparedMetadata.name ?? `BCN Meetup - ${trimmedAttendeeName}`),
           image: String(preparedMetadata.image ?? ''),
+          mediaType: String(preparedMetadata.mediaType ?? 'image/png'),
           event_name: String(preparedMetadata.event_name ?? ''),
           event_date: String(preparedMetadata.event_date ?? ''),
           venue: String(preparedMetadata.venue ?? ''),
@@ -250,7 +254,9 @@ function ClaimPageContent() {
           poster_embedded: Boolean(preparedMetadata.poster_embedded),
           version: Number(preparedMetadata.version ?? 1),
         }),
+        'Mesh',
       );
+      (tx as any).txBuilder.txOutInlineDatumValue(referenceDatumCbor, 'CBOR');
       tx.setMetadata(721, buildCip25V2Metadata({
         policyId,
         assetNameHex: cip68UserAssetNameHex(`BCN_Meetup_${attendeeId}`),
@@ -258,12 +264,12 @@ function ClaimPageContent() {
           ...mintMetadata,
           name: preparedMetadata.name,
           image: preparedMetadata.image,
-          mediaType: preparedMetadata.mediaType ?? 'image/svg+xml',
+          mediaType: preparedMetadata.mediaType ?? 'image/png',
           description: `BCN Meetup attendee NFT claimed by ${trimmedAttendeeName}`,
           files: [
             {
               name: preparedMetadata.name,
-              mediaType: preparedMetadata.mediaType ?? 'image/svg+xml',
+              mediaType: preparedMetadata.mediaType ?? 'image/png',
               src: preparedMetadata.image,
             },
           ],

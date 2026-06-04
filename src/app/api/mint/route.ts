@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { generateSVG } from '../../../generate-svg.js';
 import { buildAttendeeMetadata } from '../../../lib/attendee-metadata';
 import { normalizeMeshMetadata } from '../../../lib/mesh-metadata';
@@ -65,9 +66,14 @@ export async function POST(request: Request) {
     const metadata = buildAttendeeMetadata(attendeeNumber);
 
     const svg = generateSVG(attendeeNumber, Number(metadata.attended_count ?? 1), attendeeName);
+    // Cardano wallets (Eternl, Lace, Begin, …) don't render SVG NFT images —
+    // they show a broken-image placeholder. Rasterize to PNG so the poster
+    // displays like any normal image. density 144 (2× the 72-dpi default)
+    // renders the 800×1120 SVG at 1600×2240 for crisp text.
+    const png = await sharp(Buffer.from(svg), { density: 144 }).png().toBuffer();
     const cid = await pinFileToPinata(
-      new Blob([svg], { type: 'image/svg+xml' }),
-      `BCN_Meetup_${attendeeId}_${attendeeName}.svg`,
+      new Blob([new Uint8Array(png)], { type: 'image/png' }),
+      `BCN_Meetup_${attendeeId}_${attendeeName}.png`,
     );
     const ipfsUri = `ipfs://${cid}`;
 
@@ -81,7 +87,7 @@ export async function POST(request: Request) {
         claimed_by: attendeeName,
         receiver: address,
         image: ipfsUri,
-        mediaType: 'image/svg+xml',
+        mediaType: 'image/png',
         graffiti_image: ipfsUri,
       }),
     });
