@@ -190,12 +190,17 @@ function ClaimPageContent() {
       // it ends up in extra_signatories, otherwise the script returns False
       // and the node rejects the tx in phase-2 validation.
       tx.setRequiredSigners([activeAddress]);
-      // Mesh's addCollateralIfNeeded fallback has a bug: if the wallet has no
-      // designated collateral but does have a pure-ADA utxo ≥5 ADA, it does
-      // `return [utxo]` instead of `setCollateral([utxo])`, so the tx builds
-      // with no collateral and the node rejects on submit. Pick collateral
-      // ourselves so we never depend on that broken path.
-      let collateral = await wallet.getCollateral();
+      // Pick exactly one collateral UTxO ourselves. Two reasons:
+      //  - Mesh's addCollateralIfNeeded fallback has a bug: if the wallet has no
+      //    designated collateral but does have a pure-ADA utxo ≥5 ADA, it does
+      //    `return [utxo]` instead of `setCollateral([utxo])`, so the tx builds
+      //    with no collateral and the node rejects on submit.
+      //  - A single collateral keeps us well under maxCollateralInputs (3); one
+      //    pure-ADA UTxO is enough to cover collateral for this mint.
+      // We then disable isCollateralNeeded (below) so build() doesn't add a
+      // second, duplicate copy — Conway sets forbid duplicates and a duplicated
+      // collateral input makes the node reject the tx as malformed.
+      let collateral = (await wallet.getCollateral()).slice(0, 1);
       if (collateral.length === 0) {
         const utxos = await wallet.getUtxos();
         const pureLovelace = (utxos ?? [])
@@ -224,6 +229,10 @@ function ClaimPageContent() {
           budget: { mem: 14000000, steps: 10000000000 },
         },
       );
+      // mintAsset set isCollateralNeeded = true, which makes tx.build() call
+      // addCollateralIfNeeded and add our collateral a SECOND time. We already
+      // set collateral above, so turn this off to avoid the duplicate input.
+      (tx as any).isCollateralNeeded = false;
 
       // mintAsset puts a generic CIP-68 metadata datum on the reference output,
       // but the Aiken validator expects our Cip68Datum shape (metadata map +
